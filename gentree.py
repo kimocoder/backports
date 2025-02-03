@@ -3,7 +3,7 @@
 # Generate the output tree into a specified directory.
 #
 
-import argparse, sys, os, errno, shutil, re, subprocess
+import argparse, sys, os, errno, shutil, re, subprocess warnings
 import tarfile, gzip, time
 
 # find self
@@ -184,6 +184,9 @@ def copy_files(srcpath, copy_list, outdir):
     *.awk, Kconfig, Makefile) to avoid any build remnants in the
     kernel if they should exist.
     """
+    def yellow_print(message):
+        print("\033[93m" + message + "\033[0m")  # Print in yellow color
+
     for srcitem, tgtitem in copy_list:
         if tgtitem == '':
             copytree(srcpath, outdir, ignore=shutil.ignore_patterns('*~'))
@@ -198,14 +201,17 @@ def copy_files(srcpath, copy_list, outdir):
                      os.path.join(outdir, tgtitem),
                      ignore=copy_ignore)
         else:
-            try:
-                os.makedirs(os.path.join(outdir, os.path.dirname(tgtitem)))
-            except OSError as e:
-                # ignore dirs we might have created just now
-                if e.errno != errno.EEXIST:
-                    raise
-            shutil.copy(os.path.join(srcpath, srcitem),
-                        os.path.join(outdir, tgtitem))
+            if not os.path.exists(os.path.join(srcpath, srcitem)):
+                yellow_print("File does not exist: {}".format(os.path.join(srcpath, srcitem)))
+            else:
+                try:
+                    os.makedirs(os.path.join(outdir, os.path.dirname(tgtitem)))
+                except OSError as e:
+                    # ignore dirs we might have created just now
+                    if e.errno != errno.EEXIST:
+                        raise
+                shutil.copy(os.path.join(srcpath, srcitem),
+                            os.path.join(outdir, tgtitem))
 
 
 def copy_git_files(srcpath, copy_list, rev, outdir):
