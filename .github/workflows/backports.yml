@@ -1,68 +1,110 @@
-name: Create backports CI
-
+name: Create Backports for Android & LTS Kernels
 on:
   workflow_dispatch:
     inputs:
-      kernel_version:
-        description: 'Select kernel v6.x version'
+      kernel_versions:
+        description: 'Select LTS Kernel Versions (comma-separated)'
         required: true
-        default: '6.14'
+        default: '6.6,6.1,5.15,5.10'
         type: string
 
 jobs:
   create_tar:
-    name: Create backports
+    name: Build Backports
     runs-on: ubuntu-24.04
-
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, arm, x86_64]
+        kernel_version: [6.6, 6.1, 5.15, 5.10]  # LTS Kernels
     steps:
-      - name: Install dependencies
+      - name: Install Dependencies
         run: |
           sudo apt update
-          sudo apt install -y coccinelle jq gnupg
+          sudo apt install -y coccinelle bc flex bison libssl-dev libelf-dev
 
-      - name: Checkout backports
+      - name: Checkout Backports Repository
         uses: actions/checkout@v4
         with:
           path: backports
 
-      - name: Download and verify kernel
+      - name: Set Up Cross-Compilation Toolchain
         run: |
-          wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${{ github.event.inputs.kernel_version }}.tar.xz
-          wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${{ github.event.inputs.kernel_version }}.tar.sign
-          gpg --keyserver keyserver.ubuntu.com --recv-keys 647F28654894E3BD457199BE38DBBDC86092693E
-          gpg --verify linux-${{ github.event.inputs.kernel_version }}.tar.sign
-          tar xf linux-${{ github.event.inputs.kernel_version }}.tar.xz
-          mv linux-${{ github.event.inputs.kernel_version }} linux
+          case "${{ matrix.arch }}" in
+            arm64)
+              sudo apt install -y gcc-aarch64-linux-gnu
+              CROSS_COMPILE=aarch64-linux-gnu-
+              ;;
+            arm)
+              sudo apt install -y gcc-arm-linux-gnueabihf
+              CROSS_COMPILE=arm-linux-gnueabihf-
+              ;;
+            x86_64)
+              CROSS_COMPILE=""
+              ;;
+          esac
+          echo "CROSS_COMPILE=$CROSS_COMPILE" >> $GITHUB_ENV
 
-      - name: Generate backports
+      - name: Download LTS Kernel Source (v${{ matrix.kernel_version }})
+        run: |
+          git config --global user.name 'actions'
+          git config --global user.email 'action@github.com'
+          
+          wget -q https://cdn.kernel.org/pub/linux/kernel/v${{ matrix.kernel_version:0:1 }}.x/linux-${{ matrix.kernel_version }}.tar.xz
+          tar xf linux-${{ matrix.kernel_version }}.tar.xz && rm -rf linux-${{ matrix.kernel_version }}.tar.xz
+          
+          mv linux-${{ matrix.kernel_version }} linux
+          git -C linux init
+          git -C linux add .
+          git -C linux commit -sm "linux-${{ matrix.kernel_version }}"
+
+      - name: Generate Backports Tarball
         working-directory: backports
         run: |
-          chmod +x gentree.py
-          ./gentree.py --refresh  ${GITHUB_WORKSPACE}/linux ${GITHUB_WORKSPACE}/backports-${{ github.event.inputs.kernel_version }}
+          ./gentree.py --refresh ${GITHUB_WORKSPACE}/linux ${GITHUB_WORKSPACE}/backports-${{ matrix.kernel_version }}
 
-      - name: Check for git changes
+      - name: Check for Git Changes
         working-directory: backports
         run: |
-          git diff || true
+          git diff
 
-      - name: Pack backports
+      - name: Build Backports for Android (v${{ matrix.kernel_version }})
+        working-directory: backports
         run: |
-          tar -cJf backports-${{ github.event.inputs.kernel_version }}.tar.xz backports-${{ github.event.inputs.kernel_version }}
-          sha256sum backports-${{ github.event.inputs.kernel_version }}.tar.xz > backports-${{ github.event.inputs.kernel_version }}.sha256
+          export ARCH=${{ matrix.arch }}
+          export CROSS_COMPILE=$CROSS_COMPILE
+          make defconfig
+          make -j$(nproc)
 
-      - name: Generate Changelog
+      - name: Package Backports
         run: |
-          git log --pretty=format:"%h - %s (%an, %ar)" -n 10 > changelog-${{ github.event.inputs.kernel_version }}.txt
+          tar -c backports-${{ matrix.kernel_version }}-${{ matrix.arch }} | xz > backports-${{ matrix.kernel_version }}-${{ matrix.arch }}.tar.xz
+          sha256sum backports-${{ matrix.kernel_version }}-${{ matrix.arch }}.tar.xz > backports-${{ matrix.kernel_version }}-${{ matrix.arch }}.tar.xz.sha256
 
-      - name: Release build artifacts
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: backports-${{ matrix.kernel_version }}-${{ matrix.arch }}
+          path: |
+            backports-${{ matrix.kernel_version }}-${{ matrix.arch }}.tar.xz
+            backports-${{ matrix.kernel_version }}-${{ matrix.arch }}.tar.xz.sha256
+
+  release:
+    needs: create_tar
+    name: Release Backports
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Release Backports for LTS Kernels
         uses: ncipollo/release-action@v1.14.0
         with:
           allowUpdates: true
           prerelease: false
-          name: backports v${{ github.event.inputs.kernel_version }}
-          tag: v${{ github.event.inputs.kernel_version }}
+          name: "Backports for LTS Kernels"
+          tag: "backports-lts"
           token: ${{ secrets.GITHUB_TOKEN }}
-          artifacts: |
-            backports-${{ github.event.inputs.kernel_version }}.tar.xz
-            backports-${{ github.event.inputs.kernel_version }}.tar.xz.sha256
-            changelog-${{ github.event.inputs.kernel_version }}.txt
+          artifacts: artifacts/*
