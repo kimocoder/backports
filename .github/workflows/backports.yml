@@ -1,0 +1,69 @@
+name: Create backports
+
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_version:
+        description: 'Select kernel v6.x version'
+        required: true
+        default: '6.12'
+        type: string
+
+jobs:
+  create_tar:
+    name: Create backports
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Install coccinelle
+        run: |
+          sudo apt update
+          sudo apt install -y coccinelle
+
+      - name: Checkout backports
+        uses: actions/checkout@v4
+        with:
+          path: backports
+
+      - name: Download kernel
+        run: |
+          git config --global user.name 'actions'
+          git config --global user.email 'action@github.com'
+          if [[ "${{ github.event.inputs.kernel_version }}" =~ "rc" ]]; then
+            wget -q https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/snapshot/linux-${{ github.event.inputs.kernel_version }}.tar.gz
+            tar xf linux-${{ github.event.inputs.kernel_version }}.tar.gz && rm -rf linux-${{ github.event.inputs.kernel_version }}.tar.gz
+          else
+            wget -q https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${{ github.event.inputs.kernel_version }}.tar.xz
+            tar xf linux-${{ github.event.inputs.kernel_version }}.tar.xz && rm -rf linux-${{ github.event.inputs.kernel_version }}.tar.xz
+          fi
+          mv linux-${{ github.event.inputs.kernel_version }} linux
+          git -C linux init
+          git -C linux add .
+          git -C linux commit -sm "linux-${{ github.event.inputs.kernel_version }}"
+
+      - name: Generate backports tar
+        working-directory: backports
+        run: |
+          ./gentree.py --refresh  ${GITHUB_WORKSPACE}/linux ${GITHUB_WORKSPACE}/backports-${{ github.event.inputs.kernel_version }}
+
+      - name: Check for git changes
+        working-directory: backports
+        run: |
+          git diff
+
+      - name: Pack backports
+        run: |
+          tar -c backports-${{ github.event.inputs.kernel_version }} | xz > backports-${{ github.event.inputs.kernel_version }}.tar.xz
+          sha256sum backports-${{ github.event.inputs.kernel_version }}.tar.xz > backports-${{ github.event.inputs.kernel_version }}.tar.xz.sha256
+
+      - name: Release build artifacts
+        uses: ncipollo/release-action@v1.14.0
+        with:
+          allowUpdates: true
+          prerelease: false
+          name: backports v${{ github.event.inputs.kernel_version }}
+          tag: v${{ github.event.inputs.kernel_version }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          artifacts: |
+            backports-${{ github.event.inputs.kernel_version }}.tar.xz
+            backports-${{ github.event.inputs.kernel_version }}.tar.xz.sha256
