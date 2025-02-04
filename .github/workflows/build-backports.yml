@@ -6,7 +6,6 @@ on:
 
 env:
   KERNEL_VERSION: "6.14"
-  DATE: $(date +%Y%m%d)
 
 jobs:
   create_tar:
@@ -19,6 +18,11 @@ jobs:
           sudo apt update
           sudo apt install -y coccinelle
 
+      - name: Get current date
+        id: date
+        run: |
+          echo "DATE=$(date +%Y%m%d)" >> $GITHUB_OUTPUT
+
       - name: Checkout backports
         uses: actions/checkout@v4
         with:
@@ -28,36 +32,35 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: mj22226/linux
-          ref: refs/heads/linux-${{ env.KERNEL_VERSION }}  # Ensure correct branch
+          ref: refs/heads/linux-${{ env.KERNEL_VERSION }}
           path: linux
 
       - name: Generate backports tar
         working-directory: backports
-        run: ./gentree.py --refresh ${GITHUB_WORKSPACE}/linux ${GITHUB_WORKSPACE}/backports-${{ env.KERNEL_VERSION }}.${{ env.DATE }}
+        run: |
+          ./gentree.py --refresh \
+            ${GITHUB_WORKSPACE}/linux \
+            ${GITHUB_WORKSPACE}/backports-${{ env.KERNEL_VERSION }}.${{ steps.date.outputs.DATE }}
 
       - name: Check for git changes
         working-directory: backports
         run: git diff
 
-      - name: Pack backports-${{ env.KERNEL_VERSION }}.${{ env.DATE }}.tar.xz
+      - name: Pack backports-${{ env.KERNEL_VERSION }}.${{ steps.date.outputs.DATE }}.tar.xz
         run: |
-          tar -cvf backports-${{ env.KERNEL_VERSION }}.${{ env.DATE }}.tar -C backports-${{ env.KERNEL_VERSION }}.${{ env.DATE }} .
-          xz -9 backports-${{ env.KERNEL_VERSION }}.${{ env.DATE }}.tar
-          sha256sum backports-${{ env.KERNEL_VERSION }}.${{ env.DATE }}.tar.xz > sha256sum
-
-      - name: Set release tag
-        id: tag
-        run: echo "RELEASE_TAG=v6.14.$(date +%Y%m%d)" >> $GITHUB_ENV
+          tar -cvf backports-${{ env.KERNEL_VERSION }}.${{ steps.date.outputs.DATE }}.tar \
+            -C backports-${{ env.KERNEL_VERSION }}.${{ steps.date.outputs.DATE }} .
+          xz -9 backports-${{ env.KERNEL_VERSION }}.${{ steps.date.outputs.DATE }}.tar
+          sha256sum backports-${{ env.KERNEL_VERSION }}.${{ steps.date.outputs.DATE }}.tar.xz > sha256sum
 
       - name: Release build artifacts
         uses: ncipollo/release-action@v1.14.0
         with:
           allowUpdates: true
           prerelease: false
-          name: backports v${{ env.KERNEL_VERSION }}.${{ env.DATE }}
-          tag: ${{ env.RELEASE_TAG }}
-          #tag: v${{ env.KERNEL_VERSION }}.${{ env.DATE }}
+          name: backports v${{ env.KERNEL_VERSION }}.${{ steps.date.outputs.DATE }}
+          tag: v${{ env.KERNEL_VERSION }}.${{ steps.date.outputs.DATE }}
           token: ${{ secrets.GITHUB_TOKEN }}
           artifacts: |
-            backports-${{ env.KERNEL_VERSION }}.${{ env.DATE }}.tar.xz
+            backports-${{ env.KERNEL_VERSION }}.${{ steps.date.outputs.DATE }}.tar.xz
             sha256sum
