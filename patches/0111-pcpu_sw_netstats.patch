@@ -1,6 +1,6 @@
 --- a/drivers/net/usb/usbnet.c
 +++ b/drivers/net/usb/usbnet.c
-@@ -334,8 +334,13 @@ void usbnet_skb_return (struct usbnet *d
+@@ -331,8 +331,13 @@ void usbnet_skb_return (struct usbnet *d
  		skb->protocol = eth_type_trans (skb, dev->net);
  
  	flags = u64_stats_update_begin_irqsave(&stats64->syncp);
@@ -14,7 +14,7 @@
  	u64_stats_update_end_irqrestore(&stats64->syncp, flags);
  
  	netif_dbg(dev, rx_status, dev->net, "< rx, len %zu, type 0x%x\n",
-@@ -1253,8 +1258,13 @@ static void tx_complete (struct urb *urb
+@@ -1265,8 +1270,13 @@ static void tx_complete (struct urb *urb
  		unsigned long flags;
  
  		flags = u64_stats_update_begin_irqsave(&stats64->syncp);
