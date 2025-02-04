@@ -3,7 +3,7 @@
 # Generate the output tree into a specified directory.
 #
 
-import argparse, sys, os, errno, shutil, re, subprocess warnings
+import argparse, sys, os, errno, shutil, re, subprocess, warnings
 import tarfile, gzip, time
 
 # find self
