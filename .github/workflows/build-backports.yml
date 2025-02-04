@@ -45,13 +45,18 @@ jobs:
           xz -9 backports-${{ env.KERNEL_VERSION }}.${{ env.DATE }}.tar
           sha256sum backports-${{ env.KERNEL_VERSION }}.${{ env.DATE }}.tar.xz > sha256sum
 
+      - name: Set release tag
+        id: tag
+        run: echo "RELEASE_TAG=v6.14.$(date +%Y%m%d)" >> $GITHUB_ENV
+
       - name: Release build artifacts
         uses: ncipollo/release-action@v1.14.0
         with:
           allowUpdates: true
           prerelease: false
           name: backports v${{ env.KERNEL_VERSION }}.${{ env.DATE }}
-          tag: v${{ env.KERNEL_VERSION }}.${{ env.DATE }}
+          tag: ${{ env.RELEASE_TAG }}
+          #tag: v${{ env.KERNEL_VERSION }}.${{ env.DATE }}
           token: ${{ secrets.GITHUB_TOKEN }}
           artifacts: |
             backports-${{ env.KERNEL_VERSION }}.${{ env.DATE }}.tar.xz
