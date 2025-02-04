@@ -53,7 +53,8 @@ jobs:
           # Extract major version (first digit)
           KERNEL_MAJOR=$(echo "${{ matrix.kernel_version }}" | cut -d'.' -f1)
 
-          wget -q https://cdn.kernel.org/pub/linux/kernel/v${{ matrix.kernel_version:0:1 }}.x/linux-${{ matrix.kernel_version }}.tar.xz
+          # Download the kernel source
+          wget -q https://cdn.kernel.org/pub/linux/kernel/v${KERNEL_MAJOR}.x/linux-${{ matrix.kernel_version }}.tar.xz
           tar xf linux-${{ matrix.kernel_version }}.tar.xz && rm -rf linux-${{ matrix.kernel_version }}.tar.xz
 
           mv linux-${{ matrix.kernel_version }} linux
