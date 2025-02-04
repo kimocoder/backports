@@ -4,9 +4,6 @@ on:
   workflow_dispatch:
   push:
 
-env:
-  KERNEL_VERSION: "6.14"
-
 jobs:
   create_tar:
     name: Create backports tar
@@ -17,11 +14,6 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y coccinelle
-
-      - name: Get current date
-        id: date
-        run: |
-          echo "DATE=$(date +%Y%m%d)" >> $GITHUB_OUTPUT
 
       - name: Checkout backports
         uses: actions/checkout@v4
@@ -38,20 +30,32 @@ jobs:
       - name: Generate backports tar
         working-directory: backports
         run: |
-          ./gentree.py --refresh \
-            ${GITHUB_WORKSPACE}/linux \
-            ${GITHUB_WORKSPACE}/backports-${{ env.KERNEL_VERSION }}.${{ steps.date.outputs.DATE }}
+          DATE=$(date +%Y%m%d)
+          echo "DATE=$DATE" >> $GITHUB_ENV
+          echo "Generated date: $DATE"
+          ./gentree.py --refresh ${GITHUB_WORKSPACE}/linux ${GITHUB_WORKSPACE}/backports-${{ env.KERNEL_VERSION }}.$DATE
 
       - name: Check for git changes
         working-directory: backports
         run: git diff
 
-      - name: Pack backports-${{ env.KERNEL_VERSION }}.${{ steps.date.outputs.DATE }}.tar.xz
+      - name: Pack backports-${{ env.KERNEL_VERSION }}.${{ env.DATE }}.tar.xz
         run: |
-          tar -cvf backports-${{ env.KERNEL_VERSION }}.${{ steps.date.outputs.DATE }}.tar \
-            -C backports-${{ env.KERNEL_VERSION }}.${{ steps.date.outputs.DATE }} .
-          xz -9 backports-${{ env.KERNEL_VERSION }}.${{ steps.date.outputs.DATE }}.tar
-          sha256sum backports-${{ env.KERNEL_VERSION }}.${{ steps.date.outputs.DATE }}.tar.xz > sha256sum
+          DATE=$(date +%Y%m%d)
+          echo "Packing backports-${{ env.KERNEL_VERSION }}.$DATE.tar.xz"
+          tar -cvf backports-${{ env.KERNEL_VERSION }}.$DATE.tar -C backports-${{ env.KERNEL_VERSION }}.$DATE .
+          xz -9 backports-${{ env.KERNEL_VERSION }}.$DATE.tar
+          sha256sum backports-${{ env.KERNEL_VERSION }}.$DATE.tar.xz > sha256sum
+
+      - name: Set release tag
+        id: tag
+        run: echo "RELEASE_TAG=v6.14.${{ env.DATE }}" >> $GITHUB_ENV
+
+      - name: List generated files (for debugging)
+        run: |
+          echo "Listing files"
+          ls -l backports-${{ env.KERNEL_VERSION }}.${{ env.DATE }}.tar.xz
+          ls -l sha256sum
 
       - name: Release build artifacts
         uses: ncipollo/release-action@v1.14.0
@@ -64,8 +68,3 @@ jobs:
           artifacts: |
             backports-${{ env.KERNEL_VERSION }}.${{ steps.date.outputs.DATE }}.tar.xz
             sha256sum
-
-      - name: List generated files
-        run: |
-          ls -l backports-${{ env.KERNEL_VERSION }}.${{ env.DATE }}.tar.xz
-          ls -l sha256sum
