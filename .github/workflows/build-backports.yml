@@ -64,3 +64,8 @@ jobs:
           artifacts: |
             backports-${{ env.KERNEL_VERSION }}.${{ steps.date.outputs.DATE }}.tar.xz
             sha256sum
+
+      - name: List generated files
+        run: |
+          ls -l backports-${{ env.KERNEL_VERSION }}.${{ env.DATE }}.tar.xz
+          ls -l sha256sum
