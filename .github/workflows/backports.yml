@@ -72,13 +72,13 @@ jobs:
         run: |
           git diff
 
-      - name: Build Backports for Android (v${{ matrix.kernel_version }})
-        working-directory: backports
-        run: |
-          export ARCH=${{ matrix.arch }}
-          export CROSS_COMPILE=$CROSS_COMPILE
-          make defconfig
-          make -j$(nproc)
+#      - name: Build Backports for Android (v${{ matrix.kernel_version }})
+#        working-directory: backports
+#        run: |
+#          export ARCH=${{ matrix.arch }}
+#          export CROSS_COMPILE=$CROSS_COMPILE
+#          make defconfig
+#          make -j$(nproc)
 
       - name: Package Backports
         run: |
