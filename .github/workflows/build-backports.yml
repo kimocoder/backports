@@ -3,6 +3,11 @@ name: Build Backports 6.14
 on:
   workflow_dispatch:
   push:
+
+env:
+  KERNEL_VERSION: "6.14"
+  DATE: $(date +%Y%m%d)
+
 jobs:
   create_tar:
     name: Create backports tar
@@ -19,37 +24,35 @@ jobs:
         with:
           path: backports
 
-      - name: Checkout kernel 6.14
+      - name: Checkout kernel ${{ env.KERNEL_VERSION }}
         uses: actions/checkout@v4
         with:
           repository: mj22226/linux
-          ref: refs/heads/linux-7.0
+          ref: refs/heads/linux-${{ env.KERNEL_VERSION }}  # Ensure correct branch
           path: linux
 
       - name: Generate backports tar
         working-directory: backports
-        run: ./gentree.py --refresh  ${GITHUB_WORKSPACE}/linux ${GITHUB_WORKSPACE}/backports-6.14.20241220
+        run: ./gentree.py --refresh ${GITHUB_WORKSPACE}/linux ${GITHUB_WORKSPACE}/backports-${{ env.KERNEL_VERSION }}.${{ env.DATE }}
 
       - name: Check for git changes
         working-directory: backports
         run: git diff
 
-      - name: Pack backports-6.14.20241220.tar.xz
+      - name: Pack backports-${{ env.KERNEL_VERSION }}.${{ env.DATE }}.tar.xz
         run: |
-             tar -c backports-6.14.20241220 | xz > backports-6.14.20241220.tar.xz
-             sha256sum backports-6.14.20241220.tar.xz > sha256sum
+          tar -cvf backports-${{ env.KERNEL_VERSION }}.${{ env.DATE }}.tar -C backports-${{ env.KERNEL_VERSION }}.${{ env.DATE }} .
+          xz -9 backports-${{ env.KERNEL_VERSION }}.${{ env.DATE }}.tar
+          sha256sum backports-${{ env.KERNEL_VERSION }}.${{ env.DATE }}.tar.xz > sha256sum
 
       - name: Release build artifacts
         uses: ncipollo/release-action@v1.14.0
         with:
           allowUpdates: true
           prerelease: false
-          name: backports v6.14.20241220
-          tag: v6.14.20241220
+          name: backports v${{ env.KERNEL_VERSION }}.${{ env.DATE }}
+          tag: v${{ env.KERNEL_VERSION }}.${{ env.DATE }}
           token: ${{ secrets.GITHUB_TOKEN }}
           artifacts: |
-                    backports-6.14.20241220.tar.xz
-                    sha256sum
-
-
-
+            backports-${{ env.KERNEL_VERSION }}.${{ env.DATE }}.tar.xz
+            sha256sum
