@@ -5,6 +5,7 @@
 
 import argparse, sys, os, errno, shutil, re, subprocess, warnings
 import tarfile, gzip, time
+import shutil
 
 # find self
 source_dir = os.path.abspath(os.path.dirname(__file__))
@@ -81,13 +82,11 @@ def read_dependencies(depfilename):
     Read a (the) dependency file and return the list of
     dependencies as a dictionary, mapping a Kconfig symbol
     to a list of kernel version dependencies.
-    
     If a backported feature that an upstream backported driver
     depends on had kconfig limitations (ie, debugging feature not
     available) a built constaint restriction can be expressed
     by using a kconfig expression. The kconfig expressions can
     be specified by using the "kconfig: " prefix.
-    
     While reading ignore blank or commented lines.
     """
     ret = {}
@@ -122,7 +121,7 @@ def check_output_dir(d, clean):
     if clean:
         shutil.rmtree(d, ignore_errors=True)
     try:
-        os.rmdir(d)
+        shutil.rmtree(d)
     except OSError as e:
         if e.errno != errno.ENOENT:
             raise
@@ -873,7 +872,7 @@ def process(kerneldir, copy_list_file, git_revision=None,
         logwrite('Copy original source files ...')
     else:
         logwrite('Get original source files from git ...')
-    
+
     copy_files(os.path.join(source_dir, 'backport'), backport_files, bpid.target_dir)
     copy_files(source_dir, [('README', 'README')], bpid.target_dir)
 

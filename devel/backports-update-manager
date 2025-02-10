@@ -46,10 +46,10 @@ def parse_ubuntu_ppa_page(version, baseurl):
 
     if b'Build for amd64 failed' in html:
         return None
-    pkgs = re.findall(b'href="linux-headers-[^"]*-generic_[^"]*\.deb"', html)
+    pkgs = re.findall(br'href="linux-headers-[^"]*-generic_[^"]*\.deb"', html)
     if not pkgs:
         return None
-    pkgs = re.findall(b'href="linux-headers-[^"]*_all\.deb"', html)
+    pkgs = re.findall(br'href="linux-headers-[^"]*_all\.deb"', html)
     if not pkgs:
         return None
     pkgs = [p[6:-1] for p in pkgs]
@@ -83,7 +83,7 @@ class backport_kernel_updater:
         builds = [b for b in builds if not '-rc' in b and not '-unstable' in b and not '-ckt' in b]
         last = {}
         for b in builds:
-            split = re.split(r'[.-]', b, 2)
+            split = re.split(r'[.-]', b, maxsplit=2)
             ver = '.'.join(split[:2])
             sub = b[len(ver):]
             if not sub.startswith('.'):
@@ -560,7 +560,7 @@ class backport_kernel_updater:
         if '-generic' not in kdir:
             return False
         m = re.match(r"^(?P<VERSION>\d+)\.+" \
-                     "(?P<PATCHLEVEL>\d+)[.]*", \
+                     r"(?P<PATCHLEVEL>\d+)[.]*", \
                      kdir)
         if not m:
             return False
