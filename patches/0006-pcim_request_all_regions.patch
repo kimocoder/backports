@@ -1,0 +1,36 @@
+--- a/drivers/net/wireless/intel/iwlwifi/pcie/trans.c
++++ b/drivers/net/wireless/intel/iwlwifi/pcie/trans.c
+@@ -3785,6 +3785,9 @@ struct iwl_trans *iwl_trans_pcie_alloc(s
+ {
+ 	struct iwl_trans_pcie *trans_pcie, **priv;
+ 	struct iwl_trans *trans;
++#if LINUX_VERSION_IS_LESS(6,13,0)
++	void __iomem * const *table;
++#endif
+ 	int ret, addr_size;
+ 	u32 bar0;
+ 
+@@ -3911,13 +3914,23 @@ struct iwl_trans *iwl_trans_pcie_alloc(s
+ 		}
+ 	}
+ 
++#if LINUX_VERSION_IS_GEQ(6,13,0)
+ 	ret = pcim_request_all_regions(pdev, DRV_NAME);
++#else
++	ret = pcim_iomap_regions_request_all(pdev, BIT(0), DRV_NAME);
++#endif
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Requesting all PCI BARs failed.\n");
+ 		goto out_no_pci;
+ 	}
+ 
++#if LINUX_VERSION_IS_GEQ(6,13,0)
+ 	trans_pcie->hw_base = pcim_iomap(pdev, 0, 0);
++#else
++	table = pcim_iomap_table(pdev);
++	if (table)
++		trans_pcie->hw_base = table[0];
++#endif
+ 	if (!trans_pcie->hw_base) {
+ 		dev_err(&pdev->dev, "Could not ioremap PCI BAR 0.\n");
+ 		ret = -ENODEV;

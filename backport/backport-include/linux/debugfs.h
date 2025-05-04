@@ -49,4 +49,19 @@ debugfs_leave_cancellation(struct file *file,
 }
 #endif /* <6.7 */
 
+#if LINUX_VERSION_IS_LESS(6,13,0)
+#define debugfs_short_fops file_operations
+#endif
+
+#if LINUX_VERSION_IS_LESS(6,14,0)
+#define debugfs_change_name(dir, fmt, ...) \
+	({ \
+		char *__new_name = kasprintf(GFP_KERNEL, fmt, ##__VA_ARGS__); \
+		struct dentry *__d = debugfs_rename((dir)->d_parent, dir, (dir)->d_parent, __new_name); \
+		kfree(__new_name); \
+		PTR_ERR_OR_ZERO(__d); \
+	})
+#endif
+
+
 #endif /* __BACKPORT_DEBUGFS_H_ */
